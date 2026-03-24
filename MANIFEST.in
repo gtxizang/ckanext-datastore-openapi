@@ -1,0 +1,2 @@
+recursive-include ckanext/datastore_openapi/templates *.html
+recursive-include ckanext/datastore_openapi/public *.js *.css

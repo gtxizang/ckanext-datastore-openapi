@@ -18,6 +18,13 @@ setup(
     python_requires=">=3.9",
     packages=find_packages(include=["ckanext", "ckanext.*"]),
     include_package_data=True,
+    package_data={
+        "ckanext.datastore_openapi": [
+            "templates/**/*.html",
+            "public/**/*.js",
+            "public/**/*.css",
+        ],
+    },
     zip_safe=False,
     install_requires=[
         "ckan>=2.10",
