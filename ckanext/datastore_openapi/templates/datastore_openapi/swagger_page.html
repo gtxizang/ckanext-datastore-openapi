@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }} — API Documentation</title>
+<link rel="icon" href="/base/images/ckan.ico" type="image/x-icon">
+<link rel="stylesheet" href="{{ vendor_base }}/swagger-ui.css">
+<link rel="stylesheet" href="{{ vendor_base }}/swagger-page.css">
+</head>
+<body>
+<div class="page-header">
+  <h1>{{ title }}</h1>
+  <p><a href="{{ site_url }}">{{ site_url }}</a> &middot; <a href="{{ back_url }}">{{ _('Back to dataset') }}</a></p>
+</div>
+<div id="swagger-ui" data-spec-url="{{ spec_url }}"><div class="loading-message">{{ _('Loading API documentation') }}&hellip;</div></div>
+<script src="{{ vendor_base }}/swagger-ui-bundle.js"></script>
+<script src="{{ vendor_base }}/swagger-page.js"></script>
+</body>
+</html>

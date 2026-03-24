@@ -1,0 +1,276 @@
+import copy
+import html
+
+from .type_map import pg_to_jsonschema
+
+MAX_VALUE_LEN = 200
+MAX_FIELD_NAME_LEN = 100
+
+
+def _truncate(value, max_len=MAX_VALUE_LEN):
+    if value is None:
+        return ""
+    s = str(value)
+    return s[:max_len] + "\u2026" if len(s) > max_len else s
+
+
+def _escape_markdown(s):
+    if s is None:
+        return ""
+    s = str(s)
+    s = html.escape(s, quote=True)
+    for char, repl in [
+        ("|", "&#124;"), ("[", "&#91;"), ("]", "&#93;"),
+        ("(", "&#40;"), (")", "&#41;"), ("\\", "&#92;"),
+        ("`", "&#x60;"),
+    ]:
+        s = s.replace(char, repl)
+    s = s.replace("\n", " ").replace("\r", "")
+    return s
+
+
+def build_resource_spec(site_url, dataset_name, resource_name,
+                        introspection, search_url, hidden_fields=None):
+    if hidden_fields is None:
+        hidden_fields = ["_id", "_full_text"]
+
+    all_fields = (introspection or {}).get("fields", [])
+    total_records = (introspection or {}).get("totalRecords", 0)
+
+    hidden_set = set(hidden_fields)
+    user_fields = [
+        f for f in all_fields
+        if f["id"] not in hidden_set and not f["id"].startswith("_")
+    ]
+    field_names = [f["id"] for f in user_fields]
+    enum_fields = [
+        f for f in user_fields
+        if f.get("isEnum") and f.get("enumValues") and len(f["enumValues"]) > 1
+    ]
+
+    safe_dataset = _escape_markdown(dataset_name)
+    info_desc = f"**Dataset:** {safe_dataset}\n\n"
+    info_desc += f"**Source:** [{_escape_markdown(site_url)}]({site_url})\n\n"
+    if total_records:
+        info_desc += f"**Total records:** {total_records:,}\n\n"
+
+    if all_fields:
+        info_desc += f"#### Data Dictionary ({len(all_fields)} fields)\n\n"
+        info_desc += "| Field | Type | Details |\n|---|---|---|\n"
+        for f in all_fields:
+            safe_id = _escape_markdown(_truncate(f["id"], MAX_FIELD_NAME_LEN))
+            safe_type = _escape_markdown(f["type"])
+            details = ""
+            if f.get("isEnum") and f.get("enumValues"):
+                safe_vals = [
+                    _escape_markdown(_truncate(v, MAX_VALUE_LEN))
+                    for v in f["enumValues"]
+                ]
+                details = "Values: " + ", ".join(safe_vals)
+            elif f.get("min") is not None:
+                details = (
+                    f"Range: {_escape_markdown(str(f['min']))} "
+                    f"\u2014 {_escape_markdown(str(f['max']))}"
+                )
+            elif f.get("distinctCount"):
+                details = f"{_escape_markdown(str(f['distinctCount']))} distinct values"
+
+            if f.get("sample") is not None and not f.get("isEnum"):
+                safe_sample = _escape_markdown(_truncate(f["sample"], MAX_VALUE_LEN))
+                details += f". Sample: {safe_sample}" if details else f"Sample: {safe_sample}"
+
+            info_desc += f"| {safe_id} | {safe_type} | {details} |\n"
+        info_desc += "\n"
+
+    record_properties = {}
+    for f in user_fields:
+        prop = pg_to_jsonschema(f["type"])
+        if f.get("isEnum") and f.get("enumValues"):
+            prop["enum"] = [_truncate(v, MAX_VALUE_LEN) for v in f["enumValues"]]
+        if f.get("min") is not None and prop.get("type") in ("number", "integer"):
+            try:
+                prop["minimum"] = float(f["min"]) if "." in str(f["min"]) else int(f["min"])
+            except (ValueError, TypeError):
+                pass
+        if f.get("max") is not None and prop.get("type") in ("number", "integer"):
+            try:
+                prop["maximum"] = float(f["max"]) if "." in str(f["max"]) else int(f["max"])
+            except (ValueError, TypeError):
+                pass
+        record_properties[f["id"]] = prop
+
+    enum_filter_params = []
+    for f in enum_fields:
+        enum_filter_params.append({
+            "name": f"filter_{f['id']}",
+            "in": "query",
+            "required": False,
+            "schema": {
+                "type": "string",
+                "enum": [_truncate(v, MAX_VALUE_LEN) for v in f["enumValues"]],
+            },
+            "description": f"Filter by {_escape_markdown(f['id'])} ({len(f['enumValues'])} values)",
+        })
+
+    safe_field_names = [_escape_markdown(n) for n in field_names]
+    sort_desc = (
+        f'Sort string. Fields: {", ".join(safe_field_names)}. '
+        f'e.g. "{safe_field_names[0]} asc"'
+        if safe_field_names
+        else 'e.g. "field_name asc"'
+    )
+    fields_desc = (
+        f"Comma-separated fields to return. Available: {', '.join(safe_field_names)}"
+        if safe_field_names
+        else "Comma-separated field names to return"
+    )
+
+    total_str = f"{total_records:,}" if total_records else "0"
+
+    return {
+        "openapi": "3.1.0",
+        "info": {
+            "title": f"{_escape_markdown(dataset_name)} \u2014 {_escape_markdown(resource_name)}",
+            "description": info_desc,
+            "version": "1.0.0",
+        },
+        "servers": [{"url": site_url}],
+        "paths": {
+            search_url: {
+                "get": {
+                    "operationId": "resourceSearch",
+                    "summary": "Search DataStore",
+                    "description": (
+                        f"Query with filters, full-text search, sorting, "
+                        f"and pagination. Total records: **{total_str}**"
+                    ),
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                            "description": "Full-text search across all fields",
+                        },
+                        *enum_filter_params,
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "schema": {"type": "integer", "default": 10, "maximum": 32000},
+                            "description": "Max rows to return (max 32,000)",
+                        },
+                        {
+                            "name": "offset",
+                            "in": "query",
+                            "schema": {"type": "integer", "default": 0},
+                            "description": "Number of rows to skip",
+                        },
+                        {
+                            "name": "fields",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                            "description": fields_desc,
+                        },
+                        {
+                            "name": "sort",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                            "description": sort_desc,
+                        },
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/SearchResponse"},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "components": {
+            "schemas": {
+                "SearchResponse": {
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "result": {
+                            "type": "object",
+                            "properties": {
+                                "records": {
+                                    "type": "array",
+                                    "description": "Row objects",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": record_properties,
+                                    } if record_properties else {
+                                        "type": "object",
+                                    },
+                                },
+                                "fields": {
+                                    "type": "array",
+                                    "items": {"type": "object"},
+                                    "description": "Field metadata",
+                                },
+                                "total": {"type": "integer"},
+                                "limit": {"type": "integer"},
+                                "offset": {"type": "integer"},
+                                "_links": {"type": "object"},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+
+def _rewrite_refs(obj, old_name, new_name):
+    if isinstance(obj, dict):
+        for key, val in obj.items():
+            if key == "$ref" and isinstance(val, str):
+                obj[key] = val.replace(
+                    f"#/components/schemas/{old_name}",
+                    f"#/components/schemas/{new_name}",
+                )
+            else:
+                _rewrite_refs(val, old_name, new_name)
+    elif isinstance(obj, list):
+        for item in obj:
+            _rewrite_refs(item, old_name, new_name)
+
+
+def build_dataset_spec(site_url, dataset_name, resource_specs):
+    combined_paths = {}
+    combined_schemas = {}
+    tags = set()
+
+    for _, spec in resource_specs:
+        spec = copy.deepcopy(spec)
+        for path, path_item in spec.get("paths", {}).items():
+            res_id_suffix = path.rsplit("/", 2)[-2][:8] if "/resource/" in path else path[-8:]
+            for schema_name, schema in spec.get("components", {}).get("schemas", {}).items():
+                namespaced = f"{schema_name}_{res_id_suffix}"
+                combined_schemas[namespaced] = schema
+                _rewrite_refs(path_item, schema_name, namespaced)
+            for method_obj in path_item.values():
+                if isinstance(method_obj, dict) and "operationId" in method_obj:
+                    method_obj["operationId"] = f"{method_obj['operationId']}_{res_id_suffix}"
+            combined_paths[path] = path_item
+        for tag in spec.get("tags", []):
+            tags.add(tag["name"])
+
+    return {
+        "openapi": "3.1.0",
+        "info": {
+            "title": _escape_markdown(dataset_name),
+            "description": f"Combined API for all DataStore resources in **{_escape_markdown(dataset_name)}**",
+            "version": "1.0.0",
+        },
+        "servers": [{"url": site_url}],
+        "tags": [{"name": t} for t in sorted(tags)],
+        "paths": combined_paths,
+        "components": {"schemas": combined_schemas},
+    }
