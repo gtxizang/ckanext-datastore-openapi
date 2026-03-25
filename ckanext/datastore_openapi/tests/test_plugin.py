@@ -66,8 +66,7 @@ class TestResourceHooks:
 class TestDatasetHooks:
     @patch("ckanext.datastore_openapi.plugin.inject_access_services")
     def test_after_dataset_show_calls_inject(self, mock_inject):
-        mock_inject.return_value = {"injected": True}
         plugin = DatastoreOpenapiPlugin()
-        result = plugin.after_dataset_show({}, {"id": "ds-001"})
-        mock_inject.assert_called_once_with({"id": "ds-001"})
-        assert result == {"injected": True}
+        pkg_dict = {"id": "ds-001"}
+        plugin.after_dataset_show({}, pkg_dict)
+        mock_inject.assert_called_once_with(pkg_dict)

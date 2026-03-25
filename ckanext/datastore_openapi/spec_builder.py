@@ -1,5 +1,4 @@
 import copy
-import html
 
 from .type_map import pg_to_jsonschema
 
@@ -14,19 +13,11 @@ def _truncate(value, max_len=MAX_VALUE_LEN):
     return s[:max_len] + "\u2026" if len(s) > max_len else s
 
 
-def _escape_markdown(s):
+def _sanitise_for_table(s):
     if s is None:
         return ""
     s = str(s)
-    s = html.escape(s, quote=True)
-    for char, repl in [
-        ("|", "&#124;"), ("[", "&#91;"), ("]", "&#93;"),
-        ("(", "&#40;"), (")", "&#41;"), ("\\", "&#92;"),
-        ("`", "&#x60;"),
-    ]:
-        s = s.replace(char, repl)
-    s = s.replace("\n", " ").replace("\r", "")
-    return s
+    return s.replace("|", "/").replace("\n", " ").replace("\r", "")
 
 
 def build_resource_spec(site_url, dataset_name, resource_name,
@@ -48,9 +39,9 @@ def build_resource_spec(site_url, dataset_name, resource_name,
         if f.get("isEnum") and f.get("enumValues") and len(f["enumValues"]) > 1
     ]
 
-    safe_dataset = _escape_markdown(dataset_name)
+    safe_dataset = _sanitise_for_table(dataset_name)
     info_desc = f"**Dataset:** {safe_dataset}\n\n"
-    info_desc += f"**Source:** [{_escape_markdown(site_url)}]({site_url})\n\n"
+    info_desc += f"**Source:** [{_sanitise_for_table(site_url)}]({site_url})\n\n"
     if total_records:
         info_desc += f"**Total records:** {total_records:,}\n\n"
 
@@ -58,25 +49,25 @@ def build_resource_spec(site_url, dataset_name, resource_name,
         info_desc += f"#### Data Dictionary ({len(all_fields)} fields)\n\n"
         info_desc += "| Field | Type | Details |\n|---|---|---|\n"
         for f in all_fields:
-            safe_id = _escape_markdown(_truncate(f["id"], MAX_FIELD_NAME_LEN))
-            safe_type = _escape_markdown(f["type"])
+            safe_id = _sanitise_for_table(_truncate(f["id"], MAX_FIELD_NAME_LEN))
+            safe_type = _sanitise_for_table(f["type"])
             details = ""
             if f.get("isEnum") and f.get("enumValues"):
                 safe_vals = [
-                    _escape_markdown(_truncate(v, MAX_VALUE_LEN))
+                    _sanitise_for_table(_truncate(v, MAX_VALUE_LEN))
                     for v in f["enumValues"]
                 ]
                 details = "Values: " + ", ".join(safe_vals)
             elif f.get("min") is not None:
                 details = (
-                    f"Range: {_escape_markdown(str(f['min']))} "
-                    f"\u2014 {_escape_markdown(str(f['max']))}"
+                    f"Range: {_sanitise_for_table(str(f['min']))} "
+                    f"\u2014 {_sanitise_for_table(str(f['max']))}"
                 )
             elif f.get("distinctCount"):
-                details = f"{_escape_markdown(str(f['distinctCount']))} distinct values"
+                details = f"{_sanitise_for_table(str(f['distinctCount']))} distinct values"
 
             if f.get("sample") is not None and not f.get("isEnum"):
-                safe_sample = _escape_markdown(_truncate(f["sample"], MAX_VALUE_LEN))
+                safe_sample = _sanitise_for_table(_truncate(f["sample"], MAX_VALUE_LEN))
                 details += f". Sample: {safe_sample}" if details else f"Sample: {safe_sample}"
 
             info_desc += f"| {safe_id} | {safe_type} | {details} |\n"
@@ -109,19 +100,18 @@ def build_resource_spec(site_url, dataset_name, resource_name,
                 "type": "string",
                 "enum": [_truncate(v, MAX_VALUE_LEN) for v in f["enumValues"]],
             },
-            "description": f"Filter by {_escape_markdown(f['id'])} ({len(f['enumValues'])} values)",
+            "description": f"Filter by {f['id']} ({len(f['enumValues'])} values)",
         })
 
-    safe_field_names = [_escape_markdown(n) for n in field_names]
     sort_desc = (
-        f'Sort string. Fields: {", ".join(safe_field_names)}. '
-        f'e.g. "{safe_field_names[0]} asc"'
-        if safe_field_names
+        f'Sort string. Fields: {", ".join(field_names)}. '
+        f'e.g. "{field_names[0]} asc"'
+        if field_names
         else 'e.g. "field_name asc"'
     )
     fields_desc = (
-        f"Comma-separated fields to return. Available: {', '.join(safe_field_names)}"
-        if safe_field_names
+        f"Comma-separated fields to return. Available: {', '.join(field_names)}"
+        if field_names
         else "Comma-separated field names to return"
     )
 
@@ -130,7 +120,7 @@ def build_resource_spec(site_url, dataset_name, resource_name,
     return {
         "openapi": "3.1.0",
         "info": {
-            "title": f"{_escape_markdown(dataset_name)} \u2014 {_escape_markdown(resource_name)}",
+            "title": f"{dataset_name} \u2014 {resource_name}",
             "description": info_desc,
             "version": "1.0.0",
         },
@@ -265,8 +255,8 @@ def build_dataset_spec(site_url, dataset_name, resource_specs):
     return {
         "openapi": "3.1.0",
         "info": {
-            "title": _escape_markdown(dataset_name),
-            "description": f"Combined API for all DataStore resources in **{_escape_markdown(dataset_name)}**",
+            "title": dataset_name,
+            "description": f"Combined API for all DataStore resources in **{dataset_name}**",
             "version": "1.0.0",
         },
         "servers": [{"url": site_url}],

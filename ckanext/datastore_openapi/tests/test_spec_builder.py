@@ -4,7 +4,7 @@ from ckanext.datastore_openapi.spec_builder import (
     build_resource_spec,
     build_dataset_spec,
     _truncate,
-    _escape_markdown,
+    _sanitise_for_table,
 )
 
 SEARCH_URL = "/dataset/ds-001/resource/res-001/search"
@@ -90,14 +90,13 @@ class TestBuildResourceSpec:
         assert "bidding_zone" in desc
         assert "15,432" in desc
 
-    def test_title_escapes_html(self, introspection_result):
+    def test_title_preserves_names(self, introspection_result):
         spec = _build(introspection_result,
-                       dataset_name='<img src=x onerror=alert(1)>',
-                       resource_name='<script>alert(2)</script>')
+                       dataset_name="Energy Prices",
+                       resource_name="Hourly Data")
         title = spec["info"]["title"]
-        assert "<img" not in title
-        assert "<script>" not in title
-        assert "&lt;" in title
+        assert "Energy Prices" in title
+        assert "Hourly Data" in title
 
     def test_empty_introspection(self):
         spec = _build(None)
@@ -173,23 +172,22 @@ class TestTruncate:
         assert _truncate("hello") == "hello"
 
 
-class TestEscapeMarkdown:
-    def test_escapes_html(self):
-        result = _escape_markdown("<script>alert(1)</script>")
-        assert "<script>" not in result
-        assert "&lt;" in result
-
-    def test_escapes_pipe(self):
-        result = _escape_markdown("a|b")
+class TestSanitiseForTable:
+    def test_replaces_pipe(self):
+        result = _sanitise_for_table("a|b")
         assert "|" not in result
-        assert "&#124;" in result
+        assert "a/b" == result
 
     def test_none_returns_empty(self):
-        assert _escape_markdown(None) == ""
+        assert _sanitise_for_table(None) == ""
 
     def test_newlines_replaced(self):
-        result = _escape_markdown("line1\nline2")
+        result = _sanitise_for_table("line1\nline2")
         assert "\n" not in result
+
+    def test_passthrough(self):
+        result = _sanitise_for_table("<script>alert(1)</script>")
+        assert result == "<script>alert(1)</script>"
 
 
 class TestBuildDatasetSpec:

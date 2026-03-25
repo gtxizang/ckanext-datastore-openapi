@@ -64,7 +64,7 @@ class DatastoreOpenapiPlugin(plugins.SingletonPlugin):
     # IPackageController
 
     def after_dataset_show(self, context, pkg_dict):
-        return inject_access_services(pkg_dict)
+        inject_access_services(pkg_dict)
 
     # IResourceController
 

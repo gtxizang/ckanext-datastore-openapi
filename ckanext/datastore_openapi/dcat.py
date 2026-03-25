@@ -1,4 +1,3 @@
-import copy
 import logging
 
 import ckan.plugins.toolkit as toolkit
@@ -6,30 +5,29 @@ import ckan.plugins.toolkit as toolkit
 log = logging.getLogger(__name__)
 
 
-def inject_access_services(dataset_dict):
+def inject_access_services(pkg_dict):
+    """Modify pkg_dict in place — after_dataset_show ignores return values."""
     enabled = toolkit.asbool(
         toolkit.config.get("ckanext.datastore_openapi.dcat_enabled", "true")
     )
     if not enabled:
-        return dataset_dict
+        return
 
     has_ds = any(
-        r.get("datastore_active") for r in dataset_dict.get("resources", [])
+        r.get("datastore_active") for r in pkg_dict.get("resources", [])
     )
     if not has_ds:
-        return dataset_dict
+        return
 
     try:
         toolkit.url_for("datastore_openapi.resource_search",
                         dataset_id="test", resource_id="test")
     except RuntimeError:
-        # No request context (CLI, background job, harvester)
-        return dataset_dict
+        return
 
-    dataset_dict = copy.deepcopy(dataset_dict)
-    dataset_id = dataset_dict.get("name") or dataset_dict.get("id")
+    dataset_id = pkg_dict.get("name") or pkg_dict.get("id")
 
-    for resource in dataset_dict.get("resources", []):
+    for resource in pkg_dict.get("resources", []):
         if not resource.get("datastore_active"):
             continue
 
@@ -62,5 +60,3 @@ def inject_access_services(dataset_dict):
         existing_urls = {s.get("endpoint_url") for s in resource["access_services"]}
         if service["endpoint_url"] not in existing_urls:
             resource["access_services"].append(service)
-
-    return dataset_dict
