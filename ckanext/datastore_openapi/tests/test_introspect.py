@@ -191,7 +191,8 @@ class TestIntrospect:
 
     @patch("ckanext.datastore_openapi.introspect._get_datastore_engine")
     @patch("ckanext.datastore_openapi.introspect.toolkit")
-    def test_datastore_info_used_as_primary_source(self, mock_toolkit, mock_engine):
+    def test_datastore_info_min_max_takes_precedence(self, mock_toolkit, mock_engine):
+        """datastore_info min/max should be used even when pg_stats also has bounds."""
         meta_result = {
             "fields": [{"id": "price", "type": "float8"}],
             "total": 100,
@@ -210,13 +211,19 @@ class TestIntrospect:
             return fn
 
         mock_toolkit.get_action.side_effect = mock_action
+        # pg_stats returns different bounds — datastore_info should win
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [
+            ("price", -0.5, None, "{5.0,300.0}"),
+        ]
+        mock_engine.return_value.connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
+        mock_engine.return_value.connect.return_value.__exit__ = MagicMock(return_value=False)
 
         result = introspect("res-1", config={"hidden_fields": set(), "enum_threshold": 25, "max_fields": 50})
 
         price = next(f for f in result["fields"] if f["id"] == "price")
         assert price["min"] == 10.0
         assert price["max"] == 200.0
-        mock_engine.assert_not_called()
 
     @patch("ckanext.datastore_openapi.introspect._get_datastore_engine")
     @patch("ckanext.datastore_openapi.introspect.toolkit")

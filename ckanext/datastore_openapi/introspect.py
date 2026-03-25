@@ -144,13 +144,12 @@ def introspect(resource_id, context=None, config=None):
             info_stats[fi["id"]] = fi
 
     pg_stats = {}
-    if not info_stats:
-        engine = _get_datastore_engine()
-        if engine is not None:
-            try:
-                pg_stats = _query_pg_stats(engine, resource_id)
-            except Exception:
-                log.warning("pg_stats query failed for %s", resource_id, exc_info=True)
+    engine = _get_datastore_engine()
+    if engine is not None:
+        try:
+            pg_stats = _query_pg_stats(engine, resource_id)
+        except Exception:
+            log.warning("pg_stats query failed for %s", resource_id, exc_info=True)
 
     enriched_fields = []
     for f in all_fields:
