@@ -7,7 +7,7 @@ Response to Eric's code review of ckanext-openapi-view (2026-03-24). Rather than
 | # | Feedback | Status | How Addressed |
 |---|----------|--------|---------------|
 | 1 | `ckanext-name-view` is by convention a resource view plugin; `ckanext-openapiview` already in SVK | Done | Renamed to `ckanext-datastore-openapi` throughout |
-| 2 | `api/action/` hierarchy has a specific shape, this isn't that. Prefer `[resource_url]/openapi.json` | Done | Routes: `/dataset/<id>/resource/<id>/openapi.json`, `/search`, `/openapi` |
+| 2 | `api/action/` hierarchy has a specific shape, this isn't that. Prefer `[resource_url]/openapi.json` | Done | Routes: `/dataset/<dataset_id>/resource/<resource_id>/openapi.json`, `/search`, `/openapi` |
 | 3 | Introspect looks expensive | Done | Single `pg_stats` query (0.137ms) replaces per-field SELECT DISTINCT (420ms/field) |
 | 4 | Joel's `datastore_info` saves in DB rather than as cache | Done | `datastore_info` checked first, pg_stats as fallback |
 | 5 | Cache invalidation tricky with timeseries; schema only changes on `datastore_create`, min/max changes anytime | Partial | See [Cache design notes](#cache-design-notes) below |

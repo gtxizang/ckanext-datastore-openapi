@@ -10,11 +10,11 @@ Introspection uses PostgreSQL's `pg_stats` catalog — a single query returns en
 
 | Endpoint | What it does |
 |---|---|
-| `GET /dataset/<id>/resource/<id>/openapi.json` | OpenAPI 3.1.0 spec for a resource |
-| `GET /dataset/<id>/openapi.json` | Combined spec for all DataStore resources in a dataset |
-| `GET /dataset/<id>/resource/<id>/search` | REST-style search proxy (datastore_search with resource_id in path) |
-| `GET /dataset/<id>/resource/<id>/openapi` | Swagger UI page for a resource |
-| `GET /dataset/<id>/openapi` | Swagger UI page for a dataset |
+| `GET /dataset/<dataset_id>/resource/<resource_id>/openapi.json` | OpenAPI 3.1.0 spec for a resource |
+| `GET /dataset/<dataset_id>/openapi.json` | Combined spec for all DataStore resources in a dataset |
+| `GET /dataset/<dataset_id>/resource/<resource_id>/search` | REST-style search proxy (datastore_search with resource_id in path) |
+| `GET /dataset/<dataset_id>/resource/<resource_id>/openapi` | Swagger UI page for a resource |
+| `GET /dataset/<dataset_id>/openapi` | Swagger UI page for a dataset |
 
 Response schemas are fully typed:
 
@@ -31,11 +31,11 @@ records:
 
 ## How it works
 
-1. **Introspect** — `datastore_search` with `limit=0` for field names/types and total count, then a single `pg_stats` query for enum detection (via `n_distinct` + `most_common_vals`) and range bounds (via `histogram_bounds`). Falls back to `datastore_info` if available (datapusher-plus).
+1. **Introspect** — `datastore_search` with `limit=0` for field names/types and total count, then a single `pg_stats` query for enum detection (via `n_distinct` + `most_common_vals`) and range bounds (via `histogram_bounds`). For numeric/timestamp ranges, prefers `datastore_info` min/max when available (datapusher-plus), falling back to `pg_stats` histogram bounds.
 
 2. **Build spec** — OpenAPI 3.1.0 with typed response schemas, enum filter parameters, and a data dictionary in `info.description`.
 
-3. **Cache** — Per-resource specs cached via dogpile.cache (Redis or in-memory). Invalidated on dataset update or manually via sysadmin action.
+3. **Cache** — Per-resource specs cached via dogpile.cache (Redis or in-memory). Invalidated on resource update or delete, or manually via sysadmin action.
 
 4. **DCAT** — Injects `access_services` into DataStore resources for `dcat:DataService` serialization via ckanext-dcat.
 
@@ -86,8 +86,8 @@ ckanext.datastore_openapi.dcat_enabled = true
 
 | Action | Auth | Description |
 |---|---|---|
-| `datastore_openapi_resource_show` | Same as `datastore_search` | Returns OpenAPI spec for a resource |
-| `datastore_openapi_dataset_show` | Same as `package_show` | Returns combined spec for a dataset |
+| `datastore_openapi_resource_show` | Anonymous access allowed; visibility governed by `package_show` called internally | Returns OpenAPI spec for a resource |
+| `datastore_openapi_dataset_show` | Anonymous access allowed; visibility governed by `package_show` called internally | Returns combined spec for a dataset |
 | `datastore_openapi_cache_invalidate` | Sysadmin only | Invalidate cached specs |
 
 ## Swagger UI
