@@ -5,8 +5,7 @@
   {% if res.datastore_active %}
     <li>
       <a class="dropdown-item" href="{{ h.datastore_openapi_page_url(res.id, pkg.name) }}">
-        <i class="fa fa-bolt"></i>
-        {{ _('{...} Swagger') }}
+        {{ _('{ } Swagger') }}
       </a>
     </li>
   {% endif %}
