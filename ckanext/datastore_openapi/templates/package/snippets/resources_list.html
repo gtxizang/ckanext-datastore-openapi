@@ -1,13 +1,1 @@
 {% ckan_extends %}
-
-{% block resource_list %}
-  {{ super() }}
-  {% set has_datastore = resources | selectattr('datastore_active') | list | length > 0 %}
-  {% if resources and has_datastore %}
-    <div class="text-right">
-      <a class="btn btn-sm btn-primary" href="{{ h.datastore_openapi_dataset_page_url(pkg.name) }}">
-        {{ _('{ } Swagger (all resources)') }}
-      </a>
-    </div>
-  {% endif %}
-{% endblock %}

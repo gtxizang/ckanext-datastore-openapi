@@ -1,0 +1,36 @@
+{% extends "page.html" %}
+
+{% block subtitle %}{{ title }}{% endblock %}
+
+{% block breadcrumb_content %}
+  <li class="breadcrumb-item">{{ h.nav_link(_('Datasets'), named_route='dataset.search') }}</li>
+  <li class="breadcrumb-item"><a href="{{ back_url }}">{{ dataset_title }}</a></li>
+  <li class="breadcrumb-item active">{{ _('Swagger') }}</li>
+{% endblock %}
+
+{% block secondary %}{% endblock %}
+
+{% block primary %}
+  <div class="primary col-md-12 col-xs-12" role="main">
+    {% block primary_content %}
+      <article class="module">
+        <div class="module-content">
+          {% block primary_content_inner %}
+            <link rel="stylesheet" href="{{ vendor_base }}/swagger-ui.css">
+            <link rel="stylesheet" href="{{ vendor_base }}/swagger-page.css">
+            <style>
+              .swagger-ui .topbar { display: none; }
+              .swagger-ui { font-size: 14px; }
+              #swagger-ui { min-height: 600px; }
+            </style>
+            <div id="swagger-ui" data-spec-url="{{ spec_url }}">
+              <div class="loading-message">{{ _('Loading API documentation') }}&hellip;</div>
+            </div>
+            <script src="{{ vendor_base }}/swagger-ui-bundle.js"></script>
+            <script src="{{ vendor_base }}/swagger-page.js"></script>
+          {% endblock %}
+        </div>
+      </article>
+    {% endblock %}
+  </div>
+{% endblock %}

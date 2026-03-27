@@ -166,9 +166,10 @@ def resource_swagger_ui(dataset_id, resource_id):
         title = f"{dataset.get('title', dataset['name'])} \u2014 {resource.get('name', resource_id)}"
 
         return toolkit.render(
-            "datastore_openapi/swagger_page.html",
+            "datastore_openapi/swagger_wrapped.html",
             extra_vars={
                 "title": title,
+                "dataset_title": dataset.get("title", dataset["name"]),
                 "spec_url": spec_url,
                 "site_url": site_url,
                 "back_url": back_url,
@@ -198,9 +199,10 @@ def dataset_swagger_ui(dataset_id):
         title = dataset.get("title", dataset["name"])
 
         return toolkit.render(
-            "datastore_openapi/swagger_page.html",
+            "datastore_openapi/swagger_wrapped.html",
             extra_vars={
                 "title": title,
+                "dataset_title": title,
                 "spec_url": spec_url,
                 "site_url": site_url,
                 "back_url": back_url,
