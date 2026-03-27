@@ -35,20 +35,14 @@
   {% endblock %}
 
   <link rel="stylesheet" href="{{ vendor_base }}/swagger-ui.css">
-  <link rel="stylesheet" href="{{ vendor_base }}/swagger-page.css">
   <style>
     #swagger-ui .topbar { display: none; }
-    #swagger-ui *,
-    #swagger-ui *::before,
-    #swagger-ui *::after {
-      border-color: revert;
-      border-style: revert;
-      border-width: revert;
+    #swagger-ui *, #swagger-ui *::before, #swagger-ui *::after {
+      all: revert;
     }
-    #swagger-ui table { border-collapse: collapse; border: none !important; }
-    #swagger-ui td, #swagger-ui th, #swagger-ui tr { border: none !important; background: none !important; }
     #swagger-ui { min-height: 600px; padding: 0 15px; }
   </style>
+  <link rel="stylesheet" href="{{ vendor_base }}/swagger-ui.css">
   <div id="swagger-ui" data-spec-url="{{ spec_url }}">
     <div class="loading-message">{{ _('Loading API documentation') }}&hellip;</div>
   </div>
