@@ -18,7 +18,7 @@
         plugins: [SwaggerUIBundle.plugins.DownloadUrl],
         layout: "BaseLayout",
         tryItOutEnabled: true,
-        docExpansion: "list",
+        docExpansion: "full",
         defaultModelsExpandDepth: 0
       });
     })
