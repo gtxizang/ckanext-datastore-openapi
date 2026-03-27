@@ -162,7 +162,10 @@ def resource_swagger_ui(dataset_id, resource_id):
             _external=True,
         )
         site_url = toolkit.config.get("ckan.site_url", "").rstrip("/")
-        back_url = toolkit.url_for("dataset.read", id=dataset["name"])
+        back_url = toolkit.url_for(
+            "dataset_resource.read",
+            id=dataset["name"], resource_id=resource_id,
+        )
         title = f"{dataset.get('title', dataset['name'])} \u2014 {resource.get('name', resource_id)}"
 
         return toolkit.render(
@@ -173,6 +176,7 @@ def resource_swagger_ui(dataset_id, resource_id):
                 "spec_url": spec_url,
                 "site_url": site_url,
                 "back_url": back_url,
+                "back_label": "Back to resource",
                 "vendor_base": VENDOR_BASE,
             },
         )
@@ -206,6 +210,7 @@ def dataset_swagger_ui(dataset_id):
                 "spec_url": spec_url,
                 "site_url": site_url,
                 "back_url": back_url,
+                "back_label": "Back to dataset",
                 "vendor_base": VENDOR_BASE,
             },
         )
