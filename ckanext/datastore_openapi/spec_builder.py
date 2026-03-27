@@ -3,7 +3,6 @@ import copy
 from .type_map import pg_to_jsonschema
 
 MAX_VALUE_LEN = 200
-MAX_FIELD_NAME_LEN = 100
 
 
 def _truncate(value, max_len=MAX_VALUE_LEN):
@@ -11,13 +10,6 @@ def _truncate(value, max_len=MAX_VALUE_LEN):
         return ""
     s = str(value)
     return s[:max_len] + "\u2026" if len(s) > max_len else s
-
-
-def _sanitise_for_table(s):
-    if s is None:
-        return ""
-    s = str(s)
-    return s.replace("|", "/").replace("\n", " ").replace("\r", "")
 
 
 def build_resource_spec(site_url, dataset_name, resource_name,
@@ -39,39 +31,8 @@ def build_resource_spec(site_url, dataset_name, resource_name,
         if f.get("isEnum") and f.get("enumValues") and len(f["enumValues"]) > 1
     ]
 
-    safe_dataset = _sanitise_for_table(dataset_name)
-    info_desc = f"**Dataset:** {safe_dataset}\n\n"
-    info_desc += f"**Source:** [{_sanitise_for_table(site_url)}]({site_url})\n\n"
-    if total_records:
-        info_desc += f"**Total records:** {total_records:,}\n\n"
-
-    if all_fields:
-        info_desc += f"#### Data Dictionary ({len(all_fields)} fields)\n\n"
-        info_desc += "| Field | Type | Details |\n|---|---|---|\n"
-        for f in all_fields:
-            safe_id = _sanitise_for_table(_truncate(f["id"], MAX_FIELD_NAME_LEN))
-            safe_type = _sanitise_for_table(f["type"])
-            details = ""
-            if f.get("isEnum") and f.get("enumValues"):
-                safe_vals = [
-                    _sanitise_for_table(_truncate(v, MAX_VALUE_LEN))
-                    for v in f["enumValues"]
-                ]
-                details = "Values: " + ", ".join(safe_vals)
-            elif f.get("min") is not None:
-                details = (
-                    f"Range: {_sanitise_for_table(str(f['min']))} "
-                    f"\u2014 {_sanitise_for_table(str(f['max']))}"
-                )
-            elif f.get("distinctCount"):
-                details = f"{_sanitise_for_table(str(f['distinctCount']))} distinct values"
-
-            if f.get("sample") is not None and not f.get("isEnum"):
-                safe_sample = _sanitise_for_table(_truncate(f["sample"], MAX_VALUE_LEN))
-                details += f". Sample: {safe_sample}" if details else f"Sample: {safe_sample}"
-
-            info_desc += f"| {safe_id} | {safe_type} | {details} |\n"
-        info_desc += "\n"
+    total_str = f"{total_records:,}" if total_records else "0"
+    info_desc = f"{total_str} records \u00b7 {len(user_fields)} fields"
 
     record_properties = {}
     for f in user_fields:
@@ -115,8 +76,6 @@ def build_resource_spec(site_url, dataset_name, resource_name,
         else "Comma-separated field names to return"
     )
 
-    total_str = f"{total_records:,}" if total_records else "0"
-
     return {
         "openapi": "3.1.0",
         "info": {
@@ -125,11 +84,13 @@ def build_resource_spec(site_url, dataset_name, resource_name,
             "version": "1.0.0",
         },
         "servers": [{"url": site_url}],
+        "tags": [{"name": resource_name}],
         "paths": {
             search_url: {
                 "get": {
+                    "tags": [resource_name],
                     "operationId": "resourceSearch",
-                    "summary": "Search DataStore",
+                    "summary": f"Search {resource_name}",
                     "description": (
                         f"Query with filters, full-text search, sorting, "
                         f"and pagination. Total records: **{total_str}**"

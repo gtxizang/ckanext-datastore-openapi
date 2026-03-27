@@ -4,7 +4,6 @@ from ckanext.datastore_openapi.spec_builder import (
     build_resource_spec,
     build_dataset_spec,
     _truncate,
-    _sanitise_for_table,
 )
 
 SEARCH_URL = "/dataset/ds-001/resource/res-001/search"
@@ -83,12 +82,11 @@ class TestBuildResourceSpec:
         )
         assert "_id" not in props
 
-    def test_data_dictionary_in_description(self, introspection_result):
+    def test_description_has_summary(self, introspection_result):
         spec = _build(introspection_result)
         desc = spec["info"]["description"]
-        assert "Data Dictionary" in desc
-        assert "bidding_zone" in desc
         assert "15,432" in desc
+        assert "fields" in desc
 
     def test_title_preserves_names(self, introspection_result):
         spec = _build(introspection_result,
@@ -97,6 +95,12 @@ class TestBuildResourceSpec:
         title = spec["info"]["title"]
         assert "Energy Prices" in title
         assert "Hourly Data" in title
+
+    def test_operation_tagged_with_resource_name(self, introspection_result):
+        spec = _build(introspection_result, resource_name="Hourly Data")
+        operation = list(spec["paths"].values())[0]["get"]
+        assert operation["tags"] == ["Hourly Data"]
+        assert spec["tags"] == [{"name": "Hourly Data"}]
 
     def test_empty_introspection(self):
         spec = _build(None)
@@ -170,24 +174,6 @@ class TestTruncate:
 
     def test_short_string_unchanged(self):
         assert _truncate("hello") == "hello"
-
-
-class TestSanitiseForTable:
-    def test_replaces_pipe(self):
-        result = _sanitise_for_table("a|b")
-        assert "|" not in result
-        assert "a/b" == result
-
-    def test_none_returns_empty(self):
-        assert _sanitise_for_table(None) == ""
-
-    def test_newlines_replaced(self):
-        result = _sanitise_for_table("line1\nline2")
-        assert "\n" not in result
-
-    def test_passthrough(self):
-        result = _sanitise_for_table("<script>alert(1)</script>")
-        assert result == "<script>alert(1)</script>"
 
 
 class TestBuildDatasetSpec:
